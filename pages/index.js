@@ -1,250 +1,132 @@
 import { useState } from "react";
 
-function getRiskColor(level) {
-  if (!level) return "#5a6070";
-  const l = level.toLowerCase();
-  if (l.includes("low")) return "#00e5a0";
-  if (l.includes("medium")) return "#f5c542";
-  if (l.includes("high")) return "#ff4d6d";
-  return "#5a6070";
-}
-
-function parseAnalysis(text) {
-  const lines = text.split("\n");
-  const result = {};
-  let reasoningLines = [];
-  let adviceLines = [];
-  let inReasoning = false;
-  let inAdvice = false;
-
-  lines.forEach(line => {
-    const low = line.toLowerCase();
-    if (low.includes("risk level:")) { result.riskLevel = line.split(":").slice(1).join(":").trim(); inReasoning = false; inAdvice = false; }
-    else if (low.includes("capital risk score:")) { result.capitalRiskScore = line.split(":").slice(1).join(":").trim().replace(/\D.*/, "").trim(); inReasoning = false; inAdvice = false; }
-    else if (low.includes("position size verdict:")) { result.positionSizeVerdict = line.split(":").slice(1).join(":").trim(); inReasoning = false; inAdvice = false; }
-    else if (low.includes("bias detected:")) { result.biasDetected = line.split(":").slice(1).join(":").trim(); inReasoning = false; inAdvice = false; }
-    else if (low.includes("suggested safer position size:")) { result.suggestedSize = line.split(":").slice(1).join(":").trim(); inReasoning = false; inAdvice = false; }
-    else if (low.includes("reasoning:")) { reasoningLines = [line.split(":").slice(1).join(":").trim()]; inReasoning = true; inAdvice = false; }
-    else if (low.includes("final advice:")) { adviceLines = [line.split(":").slice(1).join(":").trim()]; inAdvice = true; inReasoning = false; }
-    else if (inReasoning && line.trim()) reasoningLines.push(line.trim());
-    else if (inAdvice && line.trim()) adviceLines.push(line.trim());
-  });
-
-  result.reasoning = reasoningLines.filter(Boolean).join(" ");
-  result.finalAdvice = adviceLines.filter(Boolean).join(" ");
-  return result;
-}
-
 export default function Home() {
-  const [form, setForm] = useState({
-    event: "", marketProb: "", userConfidence: "",
-    bankroll: "", positionSize: "", reason: "",
-  });
-  const [result, setResult] = useState(null);
+  const [event, setEvent] = useState("");
+  const [marketProb, setMarketProb] = useState("");
+  const [confidence, setConfidence] = useState("");
+  const [bankroll, setBankroll] = useState("");
+  const [position, setPosition] = useState("");
+  const [reason, setReason] = useState("");
+  const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const handleChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
-  const canSubmit = form.event && form.bankroll && form.positionSize && form.userConfidence;
+  const [error, setError] = useState("");
 
   const analyze = async () => {
+    if (!event || !confidence || !bankroll || !position) {
+      setError("Please fill in all required fields");
+      return;
+    }
     setLoading(true);
-    setError(null);
-    setResult(null);
+    setError("");
+    setResult("");
     try {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          event, marketProb, userConfidence: confidence,
+          bankroll, positionSize: position, reason
+        }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setResult(parseAnalysis(data.result));
+      setResult(data.result);
     } catch (err) {
-      setError(err.message || "Analysis failed. Please try again.");
-    } finally {
-      setLoading(false);
+      setError(err.message || "Something went wrong");
     }
+    setLoading(false);
   };
 
-  const scoreNum = result ? parseInt(result.capitalRiskScore) || 0 : 0;
-  const capitalAtRisk = form.bankroll && form.positionSize
-    ? ((parseFloat(form.positionSize) / parseFloat(form.bankroll)) * 100).toFixed(1)
+  const capitalAtRisk = bankroll && position
+    ? ((parseFloat(position) / parseFloat(bankroll)) * 100).toFixed(1)
     : null;
-  const riskColor = getRiskColor(result?.riskLevel);
 
   return (
-    <div style={s.app}>
-      <div style={s.container}>
-        <div style={s.header}>
-          <div style={s.badge}>⚠ Capital Protection System</div>
-          <h1 style={s.title}>
-            Prediction<br />
-            <span style={{ color: "#00e5a0" }}>Risk Guard</span>
-          </h1>
-          <p style={s.subtitle}>Submit your bet. Get an AI risk analysis before you commit capital.</p>
+    <div style={{ background: "#0a0c0f", minHeight: "100vh", padding: "30px 16px", fontFamily: "monospace", color: "#e8ecf0" }}>
+      <div style={{ maxWidth: 680, margin: "0 auto" }}>
+
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{ color: "#00e5a0", fontSize: 10, letterSpacing: 3, marginBottom: 12 }}>⚠ CAPITAL PROTECTION SYSTEM</div>
+          <div style={{ fontSize: 42, fontWeight: 900, lineHeight: 1.1, letterSpacing: -2 }}>
+            Prediction<br /><span style={{ color: "#00e5a0" }}>Risk Guard</span>
+          </div>
+          <div style={{ color: "#5a6070", fontSize: 12, marginTop: 10 }}>Submit your bet. Get an AI risk analysis before you commit capital.</div>
         </div>
 
-        <div style={s.card}>
-          <div style={s.sectionLabel}>▸ Bet Details</div>
-          <div style={s.field}>
-            <label style={s.label}>Event Description *</label>
-            <textarea style={s.textarea} name="event" value={form.event} onChange={handleChange}
-              placeholder="e.g. Will the Fed cut rates in March 2025?" />
+        <div style={{ background: "#111318", border: "1px solid #1e2330", padding: 24, marginBottom: 16 }}>
+          <div style={{ color: "#00e5a0", fontSize: 10, letterSpacing: 3, marginBottom: 20 }}>▸ BET DETAILS</div>
+
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 9, color: "#5a6070", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>Event Description *</div>
+            <textarea value={event} onChange={e => setEvent(e.target.value)}
+              placeholder="e.g. Will Bitcoin hit $100k by end of 2025?"
+              style={{ width: "100%", background: "#0a0c0f", border: "1px solid #1e2330", color: "#e8ecf0", padding: "11px 13px", fontSize: 13, fontFamily: "monospace", minHeight: 80, resize: "vertical" }} />
           </div>
-          <div style={s.row}>
-            <div style={s.field}>
-              <label style={s.label}>Market Odds</label>
-              <input style={s.input} name="marketProb" value={form.marketProb} onChange={handleChange} placeholder="e.g. 72%" />
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 9, color: "#5a6070", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>Market Odds</div>
+              <input value={marketProb} onChange={e => setMarketProb(e.target.value)} placeholder="e.g. 45%"
+                style={{ width: "100%", background: "#0a0c0f", border: "1px solid #1e2330", color: "#e8ecf0", padding: "11px 13px", fontSize: 13, fontFamily: "monospace" }} />
             </div>
-            <div style={s.field}>
-              <label style={s.label}>Confidence % *</label>
-              <input style={s.input} name="userConfidence" type="number" min="1" max="100" value={form.userConfidence} onChange={handleChange} placeholder="e.g. 80" />
-            </div>
-          </div>
-          <div style={s.row}>
-            <div style={s.field}>
-              <label style={s.label}>Bankroll ($) *</label>
-              <input style={s.input} name="bankroll" type="number" value={form.bankroll} onChange={handleChange} placeholder="e.g. 5000" />
-            </div>
-            <div style={s.field}>
-              <label style={s.label}>Position Size ($) *</label>
-              <input style={s.input} name="positionSize" type="number" value={form.positionSize} onChange={handleChange} placeholder="e.g. 500" />
+            <div>
+              <div style={{ fontSize: 9, color: "#5a6070", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>Confidence % *</div>
+              <input value={confidence} onChange={e => setConfidence(e.target.value)} placeholder="e.g. 80" type="number"
+                style={{ width: "100%", background: "#0a0c0f", border: "1px solid #1e2330", color: "#e8ecf0", padding: "11px 13px", fontSize: 13, fontFamily: "monospace" }} />
             </div>
           </div>
-          <div style={s.field}>
-            <label style={s.label}>Reason for Bet</label>
-            <input style={s.input} name="reason" value={form.reason} onChange={handleChange}
-              placeholder="e.g. Strong setup, news catalyst..." />
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 9, color: "#5a6070", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>Bankroll ($) *</div>
+              <input value={bankroll} onChange={e => setBankroll(e.target.value)} placeholder="e.g. 1000" type="number"
+                style={{ width: "100%", background: "#0a0c0f", border: "1px solid #1e2330", color: "#e8ecf0", padding: "11px 13px", fontSize: 13, fontFamily: "monospace" }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 9, color: "#5a6070", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>Position Size ($) *</div>
+              <input value={position} onChange={e => setPosition(e.target.value)} placeholder="e.g. 100" type="number"
+                style={{ width: "100%", background: "#0a0c0f", border: "1px solid #1e2330", color: "#e8ecf0", padding: "11px 13px", fontSize: 13, fontFamily: "monospace" }} />
+            </div>
           </div>
-          <button style={{ ...s.btn, opacity: (!canSubmit || loading) ? 0.4 : 1 }}
-            onClick={analyze} disabled={!canSubmit || loading}>
+
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 9, color: "#5a6070", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>Reason for Bet</div>
+            <input value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. Strong momentum, news catalyst..."
+              style={{ width: "100%", background: "#0a0c0f", border: "1px solid #1e2330", color: "#e8ecf0", padding: "11px 13px", fontSize: 13, fontFamily: "monospace" }} />
+          </div>
+
+          <button onClick={analyze} disabled={loading}
+            style={{ width: "100%", padding: 16, background: loading ? "#5a6070" : "#00e5a0", color: "#0a0c0f", border: "none", fontSize: 15, fontWeight: 900, letterSpacing: 1, textTransform: "uppercase", cursor: "pointer", marginTop: 8 }}>
             {loading ? "Analyzing..." : "Analyze Risk →"}
           </button>
-          {error && <div style={s.errorBox}>{error}</div>}
+
+          {error && <div style={{ background: "rgba(255,77,109,0.1)", border: "1px solid rgba(255,77,109,0.3)", color: "#ff4d6d", padding: "12px 16px", fontSize: 12, marginTop: 12 }}>{error}</div>}
         </div>
 
         {loading && (
-          <div style={s.card}>
-            <div style={s.loadingWrap}>
-              <div style={s.spinner} />
-              <div style={{ fontSize: 11, letterSpacing: 3, color: "#5a6070" }}>RUNNING RISK ANALYSIS</div>
-            </div>
+          <div style={{ background: "#111318", border: "1px solid #1e2330", padding: 40, textAlign: "center", color: "#5a6070", fontSize: 11, letterSpacing: 3 }}>
+            RUNNING RISK ANALYSIS...
           </div>
         )}
 
         {result && !loading && (
-          <div style={s.card}>
-            <div style={s.riskHeader}>
-              <div>
-                <div style={{ fontSize: 10, letterSpacing: 2, color: "#5a6070", marginBottom: 4 }}>RISK LEVEL</div>
-                <div style={{ ...s.riskBadge, color: riskColor }}>
-                  <span style={{ ...s.dot, background: riskColor }} />
-                  {result.riskLevel || "—"}
-                </div>
+          <div style={{ background: "#111318", border: "1px solid #1e2330", padding: 24 }}>
+
+            {capitalAtRisk && (
+              <div style={{ background: "#0a0c0f", border: "1px solid #1e2330", padding: "10px 14px", marginBottom: 20, fontSize: 12, color: "#f5c542" }}>
+                ⚠ Capital at Risk: <strong>{capitalAtRisk}%</strong> of your bankroll
               </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 10, letterSpacing: 2, color: "#5a6070", marginBottom: 4 }}>RISK SCORE</div>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 42, fontWeight: 800, color: riskColor, lineHeight: 1 }}>
-                  {result.capitalRiskScore || "—"}
-                  <span style={{ fontSize: 16, color: "#5a6070" }}>/10</span>
-                </div>
-                <div style={s.barBg}>
-                  <div style={{ ...s.barFill, width: `${scoreNum * 10}%`, background: riskColor }} />
-                </div>
-              </div>
+            )}
+
+            <div style={{ fontSize: 10, color: "#5a6070", letterSpacing: 3, marginBottom: 12 }}>▸ FULL ANALYSIS</div>
+            <div style={{ fontSize: 13, lineHeight: 2, color: "#e8ecf0", whiteSpace: "pre-wrap" }}>
+              {result}
             </div>
 
-            <div style={s.metrics}>
-              <div style={s.metricBox}>
-                <div style={s.metricName}>Position</div>
-                <div style={{ ...s.metricVal, color: result.positionSizeVerdict?.toLowerCase().includes("safe") ? "#00e5a0" : result.positionSizeVerdict?.toLowerCase().includes("danger") ? "#ff4d6d" : "#f5c542" }}>
-                  {result.positionSizeVerdict || "—"}
-                </div>
-              </div>
-              <div style={s.metricBox}>
-                <div style={s.metricName}>Bias</div>
-                <div style={{ ...s.metricVal, color: result.biasDetected?.toLowerCase().includes("none") ? "#00e5a0" : "#ff4d6d" }}>
-                  {result.biasDetected || "—"}
-                </div>
-              </div>
-              <div style={s.metricBox}>
-                <div style={s.metricName}>At Risk</div>
-                <div style={{ ...s.metricVal, color: riskColor }}>
-                  {capitalAtRisk ? `${capitalAtRisk}%` : "—"}
-                </div>
-              </div>
-            </div>
-
-            {result.suggestedSize && (
-              <div style={{ marginBottom: 20 }}>
-                <div style={s.metricName}>Suggested Safer Position</div>
-                <div style={s.suggestedPill}>{result.suggestedSize}</div>
-              </div>
-            )}
-
-            <div style={s.divider} />
-
-            {result.reasoning && (
-              <>
-                <div style={s.sectionTitle}>▸ Reasoning</div>
-                <p style={s.reasoning}>{result.reasoning}</p>
-              </>
-            )}
-
-            {result.finalAdvice && (
-              <div style={s.adviceBox}>
-                <div style={{ ...s.sectionTitle, marginBottom: 8 }}>▸ Final Advice</div>
-                {result.finalAdvice}
-              </div>
-            )}
           </div>
         )}
-      </div>
 
-      <style>{`
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #0a0c0f; }
-        input::placeholder, textarea::placeholder { color: #3a4050; }
-        input:focus, textarea:focus { outline: none; border-color: #00e5a0 !important; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-      `}</style>
+      </div>
     </div>
   );
-}
-
-const s = {
-  app: { minHeight: "100vh", background: "#0a0c0f", padding: "36px 16px 80px", fontFamily: "'DM Mono', monospace", color: "#e8ecf0" },
-  container: { maxWidth: 700, margin: "0 auto" },
-  header: { textAlign: "center", marginBottom: 40 },
-  badge: { display: "inline-block", border: "1px solid #00e5a0", color: "#00e5a0", fontSize: 10, letterSpacing: 3, padding: "4px 14px", textTransform: "uppercase", marginBottom: 18 },
-  title: { fontFamily: "'Syne', sans-serif", fontSize: "clamp(34px, 8vw, 60px)", fontWeight: 800, lineHeight: 1.05, letterSpacing: -2, color: "#e8ecf0" },
-  subtitle: { marginTop: 12, fontSize: 12, color: "#5a6070", lineHeight: 1.7 },
-  card: { background: "#111318", border: "1px solid #1e2330", padding: "24px 20px", marginBottom: 20, animation: "fadeUp 0.4s ease" },
-  sectionLabel: { fontSize: 10, letterSpacing: 3, textTransform: "uppercase", color: "#00e5a0", marginBottom: 20 },
-  field: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 },
-  row: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
-  label: { fontSize: 9, letterSpacing: 2, textTransform: "uppercase", color: "#5a6070" },
-  input: { background: "#0a0c0f", border: "1px solid #1e2330", color: "#e8ecf0", fontFamily: "'DM Mono', monospace", fontSize: 13, padding: "11px 13px", width: "100%" },
-  textarea: { background: "#0a0c0f", border: "1px solid #1e2330", color: "#e8ecf0", fontFamily: "'DM Mono', monospace", fontSize: 13, padding: "11px 13px", width: "100%", minHeight: 80, resize: "vertical" },
-  btn: { width: "100%", padding: 15, background: "#00e5a0", color: "#0a0c0f", border: "none", fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", cursor: "pointer", marginTop: 8 },
-  errorBox: { background: "rgba(255,77,109,0.1)", border: "1px solid rgba(255,77,109,0.3)", color: "#ff4d6d", padding: "12px 16px", fontSize: 12, marginTop: 12 },
-  loadingWrap: { textAlign: "center", padding: "32px 0" },
-  spinner: { width: 24, height: 24, border: "2px solid #1e2330", borderTopColor: "#00e5a0", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 14px" },
-  riskHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 },
-  riskBadge: { fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 800, display: "flex", alignItems: "center", gap: 10 },
-  dot: { width: 10, height: 10, borderRadius: "50%", display: "inline-block", animation: "pulse 2s infinite", flexShrink: 0 },
-  barBg: { height: 3, background: "#1e2330", marginTop: 6, overflow: "hidden" },
-  barFill: { height: "100%", transition: "width 0.8s ease" },
-  metrics: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 },
-  metricBox: { background: "#0a0c0f", border: "1px solid #1e2330", padding: "12px 10px" },
-  metricName: { fontSize: 8, letterSpacing: 2, textTransform: "uppercase", color: "#5a6070", marginBottom: 5 },
-  metricVal: { fontSize: 12, fontWeight: 500 },
-  suggestedPill: { display: "inline-block", background: "rgba(0,229,160,0.1)", border: "1px solid rgba(0,229,160,0.3)", color: "#00e5a0", padding: "5px 14px", fontSize: 14, marginTop: 5 },
-  divider: { border: "none", borderTop: "1px solid #1e2330", margin: "20px 0" },
-  sectionTitle: { fontSize: 9, letterSpacing: 3, textTransform: "uppercase", color: "#5a6070", marginBottom: 10 },
-  reasoning: { fontSize: 12, lineHeight: 1.85, color: "#b0b8c8" },
-  adviceBox: { background: "#0a0c0f", borderLeft: "3px solid #00e5a0", padding: "16px 18px", marginTop: 18, fontSize: 12, lineHeight: 1.85, color: "#e8ecf0" },
-};
+                  }
