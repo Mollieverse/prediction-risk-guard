@@ -3,32 +3,36 @@ import { useState } from "react";
 function getRiskColor(level) {
   if (!level) return "#5a6070";
   const l = level.toLowerCase();
-  if (l === "low") return "#00e5a0";
-  if (l === "medium") return "#f5c542";
-  if (l === "high") return "#ff4d6d";
+  if (l.includes("low")) return "#00e5a0";
+  if (l.includes("medium")) return "#f5c542";
+  if (l.includes("high")) return "#ff4d6d";
   return "#5a6070";
 }
 
 function parseAnalysis(text) {
-  const get = (key) => {
-    const regex = new RegExp(`${key}:\\s*(.+?)(?:\\n|$)`, "i");
-    const m = text.match(regex);
-    return m ? m[1].trim() : null;
-  };
-  const getBlock = (key) => {
-    const regex = new RegExp(`${key}:\\s*([\\s\\S]+?)(?=\\n[A-Z][^:]+:|$)`, "i");
-    const m = text.match(regex);
-    return m ? m[1].trim() : null;
-  };
-  return {
-    riskLevel: get("Risk Level"),
-    capitalRiskScore: get("Capital Risk Score"),
-    positionSizeVerdict: get("Position Size Verdict"),
-    biasDetected: get("Bias Detected"),
-    suggestedSize: get("Suggested Safer Position Size"),
-    reasoning: getBlock("Reasoning"),
-    finalAdvice: getBlock("Final Advice"),
-  };
+  const lines = text.split("\n");
+  const result = {};
+  let reasoningLines = [];
+  let adviceLines = [];
+  let inReasoning = false;
+  let inAdvice = false;
+
+  lines.forEach(line => {
+    const low = line.toLowerCase();
+    if (low.includes("risk level:")) { result.riskLevel = line.split(":").slice(1).join(":").trim(); inReasoning = false; inAdvice = false; }
+    else if (low.includes("capital risk score:")) { result.capitalRiskScore = line.split(":").slice(1).join(":").trim().replace(/\D.*/, "").trim(); inReasoning = false; inAdvice = false; }
+    else if (low.includes("position size verdict:")) { result.positionSizeVerdict = line.split(":").slice(1).join(":").trim(); inReasoning = false; inAdvice = false; }
+    else if (low.includes("bias detected:")) { result.biasDetected = line.split(":").slice(1).join(":").trim(); inReasoning = false; inAdvice = false; }
+    else if (low.includes("suggested safer position size:")) { result.suggestedSize = line.split(":").slice(1).join(":").trim(); inReasoning = false; inAdvice = false; }
+    else if (low.includes("reasoning:")) { reasoningLines = [line.split(":").slice(1).join(":").trim()]; inReasoning = true; inAdvice = false; }
+    else if (low.includes("final advice:")) { adviceLines = [line.split(":").slice(1).join(":").trim()]; inAdvice = true; inReasoning = false; }
+    else if (inReasoning && line.trim()) reasoningLines.push(line.trim());
+    else if (inAdvice && line.trim()) adviceLines.push(line.trim());
+  });
+
+  result.reasoning = reasoningLines.filter(Boolean).join(" ");
+  result.finalAdvice = adviceLines.filter(Boolean).join(" ");
+  return result;
 }
 
 export default function Home() {
@@ -154,13 +158,13 @@ export default function Home() {
             <div style={s.metrics}>
               <div style={s.metricBox}>
                 <div style={s.metricName}>Position</div>
-                <div style={{ ...s.metricVal, color: result.positionSizeVerdict?.toLowerCase() === "safe" ? "#00e5a0" : result.positionSizeVerdict?.toLowerCase() === "dangerous" ? "#ff4d6d" : "#f5c542" }}>
+                <div style={{ ...s.metricVal, color: result.positionSizeVerdict?.toLowerCase().includes("safe") ? "#00e5a0" : result.positionSizeVerdict?.toLowerCase().includes("danger") ? "#ff4d6d" : "#f5c542" }}>
                   {result.positionSizeVerdict || "—"}
                 </div>
               </div>
               <div style={s.metricBox}>
                 <div style={s.metricName}>Bias</div>
-                <div style={{ ...s.metricVal, color: result.biasDetected === "None" ? "#00e5a0" : "#ff4d6d" }}>
+                <div style={{ ...s.metricVal, color: result.biasDetected?.toLowerCase().includes("none") ? "#00e5a0" : "#ff4d6d" }}>
                   {result.biasDetected || "—"}
                 </div>
               </div>
@@ -243,4 +247,4 @@ const s = {
   sectionTitle: { fontSize: 9, letterSpacing: 3, textTransform: "uppercase", color: "#5a6070", marginBottom: 10 },
   reasoning: { fontSize: 12, lineHeight: 1.85, color: "#b0b8c8" },
   adviceBox: { background: "#0a0c0f", borderLeft: "3px solid #00e5a0", padding: "16px 18px", marginTop: 18, fontSize: 12, lineHeight: 1.85, color: "#e8ecf0" },
-};
+}; 
