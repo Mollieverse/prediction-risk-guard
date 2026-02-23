@@ -9,22 +9,23 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
-  const prompt = `You are Prediction Risk Guard. Analyze this bet:
+  const prompt = `You are Prediction Risk Guard. Analyze this bet and respond in EXACTLY this format with no extra text:
+
+Risk Level: High
+Capital Risk Score: 7
+Position Size Verdict: Risky
+Bias Detected: None
+Suggested Safer Position Size: 2% of bankroll
+Reasoning: Write 2-3 sentences here.
+Final Advice: Write 2-3 sentences here.
+
+Now analyze this actual bet and replace the example values above:
 - Event: ${event}
 - Market Odds: ${marketProb || "Not provided"}
 - Confidence: ${userConfidence}%
 - Bankroll: $${bankroll}
 - Position Size: $${positionSize}
-- Reason: ${reason || "Not provided"}
-
-Reply in EXACTLY this format:
-Risk Level: Low / Medium / High
-Capital Risk Score: X
-Position Size Verdict: Safe / Risky / Dangerous
-Bias Detected: None / FOMO / Overconfidence / Revenge Trading
-Suggested Safer Position Size: X% of bankroll
-Reasoning: 2-3 sentences.
-Final Advice: 2-3 sentences.`;
+- Reason: ${reason || "Not provided"}`;
 
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -36,6 +37,7 @@ Final Advice: 2-3 sentences.`;
       model: "llama3-70b-8192",
       messages: [{ role: "user", content: prompt }],
       max_tokens: 1024,
+      temperature: 0.3,
     })
   });
 
